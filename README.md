@@ -1,6 +1,6 @@
 # TunerStudio / TSDash to f-io LIVI telemetry bridge
 
-Telemetry bridge for sending engine and vehicle data from **TunerStudio** or **TSDash** to an **f-io/LIVI** dashboard.
+Telemetry bridge for sending engine and vehicle data from **TunerStudio** or **TSDash** to an **[f-io/LIVI](https://github.com/f-io/LIVI)** dashboard.
 
 Italian documentation is available here: [README.it.md](README.it.md).
 
