@@ -1,116 +1,118 @@
 # TunerStudio / TSDash to f-io LIVI telemetry bridge
 
-Questo progetto porta i dati motore letti da TunerStudio o TSDash dentro una dashboard f-io/LIVI.
+Telemetry bridge for sending engine and vehicle data from **TunerStudio** or **TSDash** to an **f-io/LIVI** dashboard.
 
-Nasce con due strade:
+Italian documentation is available here: [README.it.md](README.it.md).
 
-1. **Applicazione console Linux**: pensata soprattutto per **TSDash**, perche TSDash non supporta i plugin TunerStudio. In questa modalita il programma legge il traffico seriale USB in modo passivo con `/dev/usbmon`, oppure riceve pacchetti UDP dal plugin.
-2. **Plugin TunerStudio**: utile quando si usa TunerStudio completo, che puo caricare plugin Java. Il plugin e comodo, ma ha ricevuto meno attenzioni nello sviluppo rispetto alla console Linux. Se serve massima affidabilita, la console Linux resta la strada piu collaudata.
+This project provides two main integration paths:
 
-Il progetto include anche una **modalita demo** per muovere LIVI con dati plausibili senza ECU, TunerStudio o TSDash.
+1. **Linux console application**: the preferred and most developed path, especially for **TSDash**, because TSDash does not support TunerStudio plugins. It can passively read existing USB serial traffic through `/dev/usbmon`, or receive UDP packets from the plugin.
+2. **TunerStudio Java plugin**: useful when running full TunerStudio, which can load Java plugins. The plugin works, but it has received less field testing and development attention than the Linux console path.
 
-## Cosa Fa
+The project also includes a **demo mode** that sends plausible driving telemetry to LIVI without an ECU, TunerStudio, TSDash, or a serial connection.
 
-- Converte canali TunerStudio, per esempio `rpm`, `vss`, `coolant`, `iat`, `map`, `afr`, in campi LIVI come `rpm`, `speedKph`, `coolantC`, `iatC`, `mapKpa`, `afr`.
-- Invia a LIVI eventi Socket.IO/WebSocket `telemetry:push`.
-- Puo ricavare la mappa dei dati da un file `mainController.ini` TunerStudio.
-- Puo funzionare senza interferire con la seriale gia usata da TunerStudio/TSDash, leggendo `/dev/usbmon` in sola lettura.
-- Include strumenti per aggiornare la configurazione LIVI partendo da TSV e file dashboard TunerStudio.
+## What It Does
 
-## Quale Modalita Usare
+- Converts TunerStudio-style channels such as `rpm`, `vss`, `coolant`, `iat`, `map`, and `afr` into LIVI telemetry fields such as `rpm`, `speedKph`, `coolantC`, `iatC`, `mapKpa`, and `afr`.
+- Sends Socket.IO/WebSocket `telemetry:push` events to LIVI.
+- Can derive a usbmon decoding map from a TunerStudio `mainController.ini`.
+- Can observe an already-running TunerStudio/TSDash serial session without opening the serial port or writing to the ECU.
+- Includes helper tools for LIVI/TunerStudio field mapping, TunerStudio dashboard extraction, `custom.ini` formulas, and `.inc` lookup tables.
 
-| Caso | Modalita consigliata |
+## Which Mode Should I Use?
+
+| Situation | Recommended mode |
 | --- | --- |
-| Uso TSDash su Linux | Console Linux con `--source usbmon` |
-| Uso TunerStudio completo e voglio una soluzione integrata | Plugin TunerStudio in modalita `direct` |
-| Uso TunerStudio completo ma voglio lasciare la logica a Linux | Plugin TunerStudio in modalita `bridge` + console Linux `--source udp` |
-| Voglio solo vedere la dashboard LIVI muoversi | Console Linux con `--source demo` |
-| Sto debuggando mapping o valori strani | Console Linux con `--dry-run --print-raw` |
+| You use TSDash on Linux | Linux console with `--source usbmon` |
+| You use full TunerStudio and want a built-in integration | TunerStudio plugin in `direct` mode |
+| You use full TunerStudio but want the Linux app to handle mapping and LIVI output | TunerStudio plugin in `bridge` mode + Linux console with `--source udp` |
+| You only want to make the LIVI dashboard move | Linux console with `--source demo` |
+| You are debugging unstable or implausible values | Linux console with `--dry-run --print-raw` |
 
-## Flussi Dati
+## Data Paths
 
-Plugin TunerStudio in modalita direct:
-
-```text
-TunerStudio -> plugin Java -> LIVI
-```
-
-Plugin TunerStudio in modalita bridge:
+TunerStudio plugin in direct mode:
 
 ```text
-TunerStudio -> plugin Java -> UDP -> console Linux -> LIVI
+TunerStudio -> Java plugin -> LIVI
 ```
 
-TSDash o TunerStudio senza plugin, in lettura passiva:
+TunerStudio plugin in bridge mode:
 
 ```text
-TSDash/TunerStudio <-> ECU seriale USB -> /dev/usbmon -> console Linux -> LIVI
+TunerStudio -> Java plugin -> UDP -> Linux console -> LIVI
 ```
 
-Demo:
+TSDash or TunerStudio without plugins, passive read-only capture:
 
 ```text
-console Linux -> dati simulati -> LIVI
+TSDash/TunerStudio <-> USB serial ECU -> /dev/usbmon -> Linux console -> LIVI
 ```
 
-## Prerequisiti
+Demo mode:
 
-Per la console Linux:
+```text
+Linux console -> simulated telemetry -> LIVI
+```
 
-- Un sistema Linux.
-- Python 3.10 o superiore.
-- Accesso alla macchina su cui gira LIVI.
-- Per la modalita usbmon: permessi `sudo`, perche `/dev/usbmon*` richiede privilegi elevati su molte distribuzioni.
+## Requirements
 
-Per il plugin TunerStudio:
+For the Linux console application:
 
-- TunerStudio completo, non TSDash.
-- Java disponibile nell'ambiente di TunerStudio.
-- `TunerStudioPluginAPI.jar` se vuoi ricompilare il plugin.
+- Linux.
+- Python 3.10 or newer.
+- Network access to the machine where LIVI is running.
+- `sudo` permissions for usbmon mode on most Linux distributions.
 
-Nota per utenti meno esperti: i comandi che iniziano con `$` o che sono dentro blocchi `bash` vanno eseguiti nel terminale. Non copiare il simbolo `$`.
+For the TunerStudio plugin:
 
-## Installazione Console Linux
+- Full TunerStudio, not TSDash.
+- Java as provided by or available to TunerStudio.
+- The real `TunerStudioPluginAPI.jar` if you want to rebuild the plugin.
 
-Entra nella cartella della console:
+Note for less experienced users: commands shown in `bash` blocks are meant to be run in a terminal. If a tutorial or shell prompt shows a leading `$`, do not copy the `$` itself.
+
+## Install The Linux Console
+
+Open a terminal and enter the console application folder:
 
 ```bash
 cd linux-python-bridge
 ```
 
-Crea un ambiente Python isolato. Questo evita di installare librerie nel sistema:
+Create an isolated Python environment. This keeps the bridge dependencies separate from the rest of the system:
 
 ```bash
 python3 -m venv .venv
 ```
 
-Attiva l'ambiente:
+Activate it:
 
 ```bash
 . .venv/bin/activate
 ```
 
-Quando l'ambiente e attivo, di solito il prompt mostra `(.venv)` all'inizio.
+When the environment is active, your shell prompt often starts with `(.venv)`.
 
-Installa il programma:
+Install the bridge:
 
 ```bash
 pip install -e .
 ```
 
-Verifica che il comando sia disponibile:
+Check that the command is available:
 
 ```bash
 tunerstudio-livi-bridge --help
 ```
 
-Se il comando non viene trovato, controlla di avere attivato `.venv`.
+If the command is not found, make sure `.venv` is active.
 
-## Modalita Demo
+## Demo Mode
 
-La demo e il primo test consigliato. Non usa ECU, seriale, TunerStudio o TSDash.
+Demo mode is the best first test. It does not need an ECU, serial port, TunerStudio, or TSDash.
 
-Sostituisci `livi.local` con l'host o indirizzo IP della macchina su cui LIVI ascolta:
+Replace `livi.local` with the hostname or IP address of the machine where LIVI is listening:
 
 ```bash
 tunerstudio-livi-bridge \
@@ -119,7 +121,7 @@ tunerstudio-livi-bridge \
   --hz 20
 ```
 
-Per vedere cosa verrebbe inviato senza collegarsi a LIVI:
+To see what would be sent without connecting to LIVI:
 
 ```bash
 tunerstudio-livi-bridge \
@@ -129,46 +131,46 @@ tunerstudio-livi-bridge \
   --hz 5
 ```
 
-In dry-run vedrai righe JSON nel terminale. Questo e utile per capire se i campi sono corretti prima di aprire LIVI.
+In dry-run mode you should see JSON lines printed in the terminal. This is useful before connecting to a real dashboard.
 
-## Modalita TSDash / usbmon
+## TSDash / usbmon Mode
 
-Questa e la modalita principale per TSDash.
+This is the main mode for TSDash.
 
-TSDash non carica plugin TunerStudio, quindi la console Linux osserva la comunicazione USB seriale gia in corso. Non apre la porta seriale e non scrive verso la ECU: legge solo `/dev/usbmon`.
+TSDash does not load TunerStudio plugins. Instead, the Linux console observes the existing USB serial communication that TSDash is already using. It does not open the serial port and does not write to the ECU; it only reads from `/dev/usbmon`.
 
-### 1. Carica usbmon
+### 1. Enable usbmon
 
-Su molte distribuzioni serve:
+On many Linux distributions you need:
 
 ```bash
 sudo modprobe usbmon
 ```
 
-Controlla che i device esistano:
+Check that usbmon devices exist:
 
 ```bash
 ls /dev/usbmon*
 ```
 
-Dovresti vedere file come `/dev/usbmon0`, `/dev/usbmon1`, ecc.
+You should see files such as `/dev/usbmon0`, `/dev/usbmon1`, and so on.
 
-### 2. Trova la porta seriale
+### 2. Find The Serial Port
 
-La porta e di solito qualcosa come:
+The serial port usually looks like one of these:
 
 ```text
 /dev/ttyUSB0
 /dev/ttyACM0
 ```
 
-Usa la stessa porta che TSDash o TunerStudio usa per comunicare con la centralina.
+Use the same serial port that TSDash or TunerStudio uses to communicate with the ECU.
 
-### 3. Avvia con un file INI TunerStudio
+### 3. Start With A TunerStudio INI File
 
-Il modo piu comodo e passare il file `mainController.ini` del progetto TunerStudio. La console usa quel file per sapere dove sono i campi nel flusso seriale.
+The easiest and safest option is to pass the TunerStudio project `mainController.ini`. The bridge uses it to understand where the output channels are located in the serial data.
 
-Esempio:
+Example:
 
 ```bash
 sudo tunerstudio-livi-bridge \
@@ -178,15 +180,15 @@ sudo tunerstudio-livi-bridge \
   --livi-url ws://livi.local:4000
 ```
 
-Se non sai dov'e il file INI, cerca nella cartella del progetto TunerStudio, di solito sotto:
+If you do not know where the INI file is, look inside the TunerStudio project folder. It is commonly under:
 
 ```text
-TunerStudioProjects/NomeProgetto/projectCfg/mainController.ini
+TunerStudioProjects/ProjectName/projectCfg/mainController.ini
 ```
 
-### 4. Prova prima in dry-run
+### 4. Test In Dry-Run First
 
-Prima di inviare a LIVI, puoi stampare i payload:
+Before sending anything to LIVI, print the payloads:
 
 ```bash
 sudo tunerstudio-livi-bridge \
@@ -197,11 +199,11 @@ sudo tunerstudio-livi-bridge \
   --print-raw
 ```
 
-Se i valori sono plausibili in dry-run, togli `--dry-run --print-raw` e aggiungi `--livi-url`.
+If the values look plausible, remove `--dry-run --print-raw` and add `--livi-url`.
 
-### 5. Esporta la configurazione generata
+### 5. Export The Generated Config
 
-Se vuoi controllare o modificare la mappa generata dall'INI:
+To inspect or edit the map generated from the INI:
 
 ```bash
 tunerstudio-livi-bridge \
@@ -211,7 +213,7 @@ tunerstudio-livi-bridge \
   --dry-run
 ```
 
-Il file `generated-usbmon-map.json` puo poi essere passato con:
+You can then run from that JSON file:
 
 ```bash
 sudo tunerstudio-livi-bridge \
@@ -221,48 +223,48 @@ sudo tunerstudio-livi-bridge \
   --livi-url ws://livi.local:4000
 ```
 
-## Plugin TunerStudio
+## TunerStudio Plugin
 
-Il plugin e utile se usi TunerStudio completo su un computer dove puoi installare plugin Java.
+The plugin is useful when you run full TunerStudio on a computer that can load Java plugins.
 
-Importante: questa parte e meno collaudata della console Linux. Usala quando ti serve integrazione diretta dentro TunerStudio; per TSDash usa la console Linux.
+Important: the plugin path is less field-tested than the Linux console path. Use it when you need direct integration inside TunerStudio. For TSDash, use the Linux console.
 
-### Installare il jar gia compilato
+### Install The Prebuilt Jar
 
-Il jar compilato si trova qui:
+The prebuilt plugin jar is here:
 
 ```text
 tunerstudio-plugin/build/tunerstudio-livi-telemetry-plugin.jar
 ```
 
-Copia il jar nella cartella plugin/lib usata dalla tua installazione TunerStudio, seguendo lo stesso metodo usato per installare plugin di esempio.
+Copy the jar into the plugin/lib folder used by your TunerStudio installation, following the same method used for TunerStudio example plugins.
 
-Il manifest del jar contiene:
+The jar manifest contains:
 
 ```text
 ApplicationPlugin: io.fio.livi.tunerstudio.LiviTelemetryPlugin
 ```
 
-### Configurare il plugin
+### Configure The Plugin
 
-Il file di configurazione si chiama:
+The plugin configuration file is:
 
 ```text
 livi-telemetry.properties
 ```
 
-Il plugin lo cerca in questo ordine:
+The plugin searches for it in this order:
 
-1. percorso esplicito passato alla JVM con `-Dlivi.telemetry.config=...`
-2. stessa directory del jar plugin
-3. directory di lavoro di TunerStudio
+1. an explicit JVM property: `-Dlivi.telemetry.config=...`
+2. the same directory as the plugin jar
+3. TunerStudio's working directory
 4. `~/.livi/tunerstudio-livi.properties`
 
-Per una installazione semplice, metti `livi-telemetry.properties` accanto al jar.
+For a simple installation, place `livi-telemetry.properties` next to the jar.
 
-### Plugin in modalita direct
+### Plugin Direct Mode
 
-In direct mode il plugin invia direttamente a LIVI via Socket.IO/WebSocket:
+In direct mode, the plugin sends directly to LIVI through Socket.IO/WebSocket:
 
 ```properties
 livi.telemetry.mode=direct
@@ -273,17 +275,17 @@ livi.telemetry.hz=20
 livi.telemetry.channels=*
 ```
 
-Se preferisci indicare una URL completa:
+You can also set the full URL:
 
 ```properties
 livi.telemetry.livi.url=ws://livi.local:4000
 ```
 
-### Plugin in modalita bridge
+### Plugin Bridge Mode
 
-In bridge mode il plugin manda dati grezzi via UDP alla console Linux. La console fa mapping e invio a LIVI.
+In bridge mode, the plugin sends raw channel updates to the Linux console over UDP. The console handles mapping and LIVI output.
 
-Configurazione plugin:
+Plugin configuration:
 
 ```properties
 livi.telemetry.mode=bridge
@@ -292,7 +294,7 @@ livi.telemetry.udp.port=8765
 livi.telemetry.channels=*
 ```
 
-Avvio console:
+Console command:
 
 ```bash
 tunerstudio-livi-bridge \
@@ -302,11 +304,11 @@ tunerstudio-livi-bridge \
   --livi-url ws://livi.local:4000
 ```
 
-Se il plugin gira su un computer e la console Linux su un altro, cambia `udp.host` con l'host della macchina Linux e assicurati che firewall e rete permettano UDP sulla porta scelta.
+If the plugin and the Linux console run on different machines, set `udp.host` to the Linux machine hostname or IP address, and make sure the firewall allows UDP on the selected port.
 
-### Ricompilare il plugin
+### Rebuild The Plugin
 
-Serve il vero `TunerStudioPluginAPI.jar`, non il jar javadoc.
+You need the real `TunerStudioPluginAPI.jar`, not the javadoc jar.
 
 ```bash
 cd tunerstudio-plugin
@@ -314,15 +316,15 @@ chmod +x build.sh
 ./build.sh /path/to/TunerStudioPluginAPI.jar
 ```
 
-Il risultato sara:
+The output is:
 
 ```text
 tunerstudio-plugin/build/tunerstudio-livi-telemetry-plugin.jar
 ```
 
-## Mapping Dei Campi
+## Field Mapping
 
-LIVI si aspetta nomi campo specifici, per esempio:
+LIVI expects specific field names, for example:
 
 ```text
 rpm
@@ -339,20 +341,20 @@ gps.lat
 gps.lng
 ```
 
-Il progetto include una mappa TSV:
+This repository includes a TSV mapping file:
 
 ```text
 livi-tunerstudio-field-map.tsv
 ```
 
-La TSV ha due colonne importanti:
+The important columns are:
 
 ```text
 livi_field
 tunerstudio_field
 ```
 
-Esempio:
+Example:
 
 ```text
 rpm        rpm
@@ -360,37 +362,35 @@ speedKph   vss
 fuelPct    benzina
 ```
 
-I campi senza corrispondenza possono rimanere vuoti.
+Fields without a known match can be left empty.
 
-## Custom.ini, Tabelle .inc E Conversioni
+## Custom.ini, .inc Tables, And Conversions
 
-Alcuni progetti TunerStudio non inviano direttamente il valore finale mostrato sulla dashboard. A volte il valore seriale viene trasformato da formule in `custom.ini` o da tabelle `.inc`.
+Some TunerStudio projects do not send the final dashboard value directly. The serial stream may contain a raw channel that is later transformed by `custom.ini` formulas or `.inc` lookup tables.
 
-Esempio concettuale:
+Conceptual example:
 
 ```ini
 benzina = { table(auxin_gauge0, "benzina.inc") }, "L"
 ```
 
-In questo caso sulla seriale arriva `auxin_gauge0`, ma la dashboard mostra `benzina` dopo una tabella di conversione.
+In this case the serial stream contains `auxin_gauge0`, while the dashboard displays `benzina` after a lookup table conversion.
 
-Lo script:
+This helper can use TSV mappings, `custom.ini`, and `.inc` files to update LIVI JSON with the correct logic:
 
 ```bash
 python tools/update_livi_json_from_tsv.py --help
 ```
 
-puo usare TSV, `custom.ini` e file `.inc` per aggiornare il JSON LIVI con la logica corretta.
+## Helper Tools
 
-## Strumenti Utili
-
-Estrarre coppie `OutputChannel` e titolo da dashboard TunerStudio:
+Extract `OutputChannel` and gauge title pairs from a TunerStudio dashboard:
 
 ```bash
 python tools/extract_dash_gauge_channels.py dashboard.dsh > dash-gauge-outputchannel-title.tsv
 ```
 
-Aggiornare un JSON LIVI partendo dalla TSV:
+Update a LIVI JSON file from the TSV mapping:
 
 ```bash
 python tools/update_livi_json_from_tsv.py \
@@ -399,33 +399,33 @@ python tools/update_livi_json_from_tsv.py \
   --output updated-livi.json
 ```
 
-Rivedi sempre l'output prima di usarlo in macchina.
+Always review generated files before using them on a real vehicle.
 
-## Test Rapidi
+## Quick Tests
 
-### Test della console senza LIVI
+### Test The Console Without LIVI
 
 ```bash
 tunerstudio-livi-bridge --source demo --dry-run --demo-duration 3
 ```
 
-Se vedi JSON nel terminale, la console funziona.
+If JSON appears in the terminal, the console is working.
 
-### Test UDP senza TunerStudio
+### Test UDP Without TunerStudio
 
-Terminale 1:
+Terminal 1:
 
 ```bash
 tunerstudio-livi-bridge --source udp --dry-run
 ```
 
-Terminale 2:
+Terminal 2:
 
 ```bash
 python tools/send_sample_udp.py
 ```
 
-Dovresti vedere un payload simile:
+You should see a payload similar to:
 
 ```json
 {"event":"telemetry:push","payload":{"rpm":2100.0,"speedKph":72.0,"ts":1234567890}}
@@ -433,49 +433,49 @@ Dovresti vedere un payload simile:
 
 ## Troubleshooting
 
-### Non arriva nulla a LIVI
+### Nothing Arrives In LIVI
 
-- Controlla che l'URL inizi con `ws://` o `wss://`.
-- Controlla host e porta di LIVI.
-- Prova prima `--source demo --dry-run`.
-- Se usi il plugin direct, apri il pannello plugin in TunerStudio e guarda lo stato.
-- Se usi UDP tra due macchine, controlla firewall e rete.
+- Check that the URL starts with `ws://` or `wss://`.
+- Check LIVI hostname and port.
+- Try `--source demo --dry-run` first.
+- If you use plugin direct mode, open the plugin panel in TunerStudio and check the status.
+- If you send UDP between two machines, check firewall and network routing.
 
-### usbmon non si apre
+### usbmon Does Not Open
 
-Prova:
+Try:
 
 ```bash
 sudo modprobe usbmon
 ls /dev/usbmon*
 ```
 
-Poi riesegui il bridge con `sudo`.
+Then run the bridge again with `sudo`.
 
-### I valori sono instabili o non plausibili
+### Values Are Unstable Or Implausible
 
-- Usa `--tunerstudio-ini` invece di una mappa JSON scritta a mano.
-- Verifica che la porta seriale sia quella della ECU, non di un altro dispositivo USB.
-- Prova `--dry-run --print-raw` per vedere i payload prima dell'invio.
-- Controlla eventuali formule in `custom.ini` e tabelle `.inc`.
+- Prefer `--tunerstudio-ini` over a hand-written JSON map.
+- Make sure the serial port belongs to the ECU, not to another USB device.
+- Use `--dry-run --print-raw` to inspect payloads before sending them to LIVI.
+- Check for formulas in `custom.ini` and lookup tables in `.inc` files.
 
-### TSDash non vede il plugin
+### TSDash Does Not See The Plugin
 
-E normale: TSDash non supporta i plugin TunerStudio. Usa la console Linux con `--source usbmon`.
+That is expected. TSDash does not support TunerStudio plugins. Use the Linux console with `--source usbmon`.
 
-## Privacy E Pulizia Del Repository
+## Privacy Before Publishing Data
 
-Gli esempi usano host generici come `livi.local`, progetti di esempio e porte seriali standard come `/dev/ttyUSB0`.
+Examples in this repository use generic hosts such as `livi.local`, example project names, and standard serial ports such as `/dev/ttyUSB0`.
 
-Prima di pubblicare log, dump o configurazioni reali:
+Before publishing real logs, dumps, or configuration files:
 
-- rimuovi nomi utente e percorsi locali;
-- rimuovi IP privati della tua rete, se non vuoi mostrarli;
-- evita di pubblicare password o chiavi;
-- controlla i file generati da TunerStudio, perche possono contenere path completi.
+- remove user names and local paths;
+- remove private network IP addresses if you do not want to expose them;
+- never publish passwords or keys;
+- check generated TunerStudio files, because they may include full local paths.
 
-## Stato Del Progetto
+## Project Status
 
-- Console Linux: percorso piu sviluppato e consigliato, specialmente con TSDash.
-- Plugin TunerStudio: funzionante e compilabile, ma meno provato sul campo.
-- Mapping: dipende molto dal progetto ECU/TunerStudio. Controlla sempre dry-run e valori reali prima di usarlo in marcia.
+- Linux console: most developed path and recommended especially for TSDash.
+- TunerStudio plugin: working and buildable, but less field-tested.
+- Mapping: ECU and TunerStudio project dependent. Always check dry-run output and real values before relying on it while driving.
