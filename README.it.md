@@ -4,8 +4,10 @@ Questo progetto porta i dati motore letti da TunerStudio o TSDash dentro una das
 
 Nasce con due strade:
 
-1. **Applicazione console Linux**: pensata soprattutto per **TSDash**, perche TSDash non supporta i plugin TunerStudio. In questa modalita il programma legge il traffico seriale USB in modo passivo con `/dev/usbmon`, oppure riceve pacchetti UDP dal plugin.
+1. **Applicazione console Linux**: la strada preferita e piu sviluppata. Puo funzionare come bridge principale senza TunerStudio o TSDash, interrogando direttamente la seriale ECU con `--source serial`; puo anche osservare in modo passivo una sessione TunerStudio/TSDash gia aperta tramite `/dev/usbmon`, oppure ricevere pacchetti UDP dal plugin.
 2. **Plugin TunerStudio**: utile quando si usa TunerStudio completo, che puo caricare plugin Java. Il plugin e comodo, ma ha ricevuto meno attenzioni nello sviluppo rispetto alla console Linux. Se serve massima affidabilita, la console Linux resta la strada piu collaudata.
+
+Per molte installazioni, `--source serial` e la configurazione standalone piu semplice: il bridge apre la seriale della ECU, esegue letture realtime in stile TunerStudio e alimenta LIVI direttamente. Usa invece `--source usbmon` quando TSDash o TunerStudio sono gia in esecuzione e vuoi solo osservare quella comunicazione.
 
 Il progetto include anche una **modalita demo** per muovere LIVI con dati plausibili senza ECU, TunerStudio o TSDash.
 
@@ -14,6 +16,7 @@ Il progetto include anche una **modalita demo** per muovere LIVI con dati plausi
 - Converte canali TunerStudio, per esempio `rpm`, `vss`, `coolant`, `iat`, `map`, `afr`, in campi LIVI come `rpm`, `speedKph`, `coolantC`, `iatC`, `mapKpa`, `afr`.
 - Invia a LIVI eventi Socket.IO/WebSocket `telemetry:push`.
 - Puo ricavare la mappa dei dati da un file `mainController.ini` TunerStudio.
+- Puo interrogare direttamente la seriale ECU quando vuoi usare questo bridge al posto di TSDash/TunerStudio per alimentare LIVI.
 - Puo funzionare senza interferire con la seriale gia usata da TunerStudio/TSDash, leggendo `/dev/usbmon` in sola lettura.
 - Include strumenti per aggiornare la configurazione LIVI partendo da TSV e file dashboard TunerStudio.
 
@@ -21,6 +24,7 @@ Il progetto include anche una **modalita demo** per muovere LIVI con dati plausi
 
 | Caso | Modalita consigliata |
 | --- | --- |
+| Voglio alimentare LIVI senza avviare TSDash o TunerStudio | Console Linux con `--source serial` |
 | Uso TSDash su Linux | Console Linux con `--source usbmon` |
 | Voglio che il bridge parli direttamente con la seriale ECU | Console Linux con `--source serial` |
 | Uso TunerStudio completo e voglio una soluzione integrata | Plugin TunerStudio in modalita `direct` |

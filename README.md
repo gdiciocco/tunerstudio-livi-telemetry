@@ -6,8 +6,10 @@ Italian documentation is available here: [README.it.md](README.it.md).
 
 This project provides two main integration paths:
 
-1. **Linux console application**: the preferred and most developed path, especially for **TSDash**, because TSDash does not support TunerStudio plugins. It can passively read existing USB serial traffic through `/dev/usbmon`, or receive UDP packets from the plugin.
+1. **Linux console application**: the preferred and most developed path. It can run as the main bridge without TunerStudio or TSDash by actively polling the ECU serial port with `--source serial`, passively observe an existing TunerStudio/TSDash USB serial session through `/dev/usbmon`, or receive UDP packets from the plugin.
 2. **TunerStudio Java plugin**: useful when running full TunerStudio, which can load Java plugins. The plugin works, but it has received less field testing and development attention than the Linux console path.
+
+For many installations, `--source serial` is the simplest standalone setup: the bridge opens the ECU serial port, performs TunerStudio-style realtime reads, and feeds LIVI directly. Use `--source usbmon` instead when TSDash or TunerStudio is already running and you only want to observe that existing communication.
 
 The project also includes a **demo mode** that sends plausible driving telemetry to LIVI without an ECU, TunerStudio, TSDash, or a serial connection.
 
@@ -16,6 +18,7 @@ The project also includes a **demo mode** that sends plausible driving telemetry
 - Converts TunerStudio-style channels such as `rpm`, `vss`, `coolant`, `iat`, `map`, and `afr` into LIVI telemetry fields such as `rpm`, `speedKph`, `coolantC`, `iatC`, `mapKpa`, and `afr`.
 - Sends Socket.IO/WebSocket `telemetry:push` events to LIVI.
 - Can derive a usbmon decoding map from a TunerStudio `mainController.ini`.
+- Can actively poll the ECU serial port when you want this bridge to replace TSDash/TunerStudio for the LIVI telemetry feed.
 - Can observe an already-running TunerStudio/TSDash serial session without opening the serial port or writing to the ECU.
 - Includes helper tools for LIVI/TunerStudio field mapping, TunerStudio dashboard extraction, `custom.ini` formulas, and `.inc` lookup tables.
 
@@ -23,6 +26,7 @@ The project also includes a **demo mode** that sends plausible driving telemetry
 
 | Situation | Recommended mode |
 | --- | --- |
+| You want a standalone LIVI feed without running TSDash or TunerStudio | Linux console with `--source serial` |
 | You use TSDash on Linux | Linux console with `--source usbmon` |
 | You want the bridge itself to talk to the ECU serial port | Linux console with `--source serial` |
 | You use full TunerStudio and want a built-in integration | TunerStudio plugin in `direct` mode |
