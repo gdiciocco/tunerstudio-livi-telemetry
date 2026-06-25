@@ -4,22 +4,19 @@ Telemetry bridge for sending engine and vehicle data from **TunerStudio** or **T
 
 Italian documentation is available here: [README.it.md](README.it.md).
 
-This project provides two main integration paths:
+Most users should start with the **Linux console application**, which is the most developed path. It supports three practical modes:
 
-1. **Linux console application**: the preferred and most developed path. It can run as the main bridge without TunerStudio or TSDash by actively polling the ECU serial port with `--source serial`, passively observe an existing TunerStudio/TSDash USB serial session through `/dev/usbmon`, or receive UDP packets from the plugin.
-2. **TunerStudio Java plugin**: useful when running full TunerStudio, which can load Java plugins. The plugin works, but it has received less field testing and development attention than the Linux console path.
+- `--source serial`: standalone LIVI feed without running TunerStudio or TSDash. The bridge opens the ECU serial port and performs TunerStudio-style realtime reads.
+- `--source usbmon`: passive read-only capture for an existing TunerStudio/TSDash session. Use this when another program is already using the ECU serial port.
+- `--source udp`: receives packets from the TunerStudio plugin and lets the Linux console handle mapping and LIVI output.
 
-For many installations, `--source serial` is the simplest standalone setup: the bridge opens the ECU serial port, performs TunerStudio-style realtime reads, and feeds LIVI directly. Use `--source usbmon` instead when TSDash or TunerStudio is already running and you only want to observe that existing communication.
-
-The project also includes a **demo mode** that sends plausible driving telemetry to LIVI without an ECU, TunerStudio, TSDash, or a serial connection.
+The project also includes a **TunerStudio Java plugin** for full TunerStudio installations, plus a **demo mode** that sends plausible driving telemetry without an ECU or serial connection. The plugin works, but it has received less field testing and development attention than the Linux console path.
 
 ## What It Does
 
 - Converts TunerStudio-style channels such as `rpm`, `vss`, `coolant`, `iat`, `map`, and `afr` into LIVI telemetry fields such as `rpm`, `speedKph`, `coolantC`, `iatC`, `mapKpa`, and `afr`.
 - Sends Socket.IO/WebSocket `telemetry:push` events to LIVI.
-- Can derive a usbmon decoding map from a TunerStudio `mainController.ini`.
-- Can actively poll the ECU serial port when you want this bridge to replace TSDash/TunerStudio for the LIVI telemetry feed.
-- Can observe an already-running TunerStudio/TSDash serial session without opening the serial port or writing to the ECU.
+- Can derive the realtime binary map from a TunerStudio `mainController.ini`.
 - Includes helper tools for LIVI/TunerStudio field mapping, TunerStudio dashboard extraction, `custom.ini` formulas, and `.inc` lookup tables.
 
 ## Which Mode Should I Use?
@@ -28,7 +25,6 @@ The project also includes a **demo mode** that sends plausible driving telemetry
 | --- | --- |
 | You want a standalone LIVI feed without running TSDash or TunerStudio | Linux console with `--source serial` |
 | You use TSDash on Linux | Linux console with `--source usbmon` |
-| You want the bridge itself to talk to the ECU serial port | Linux console with `--source serial` |
 | You use full TunerStudio and want a built-in integration | TunerStudio plugin in `direct` mode |
 | You use full TunerStudio but want the Linux app to handle mapping and LIVI output | TunerStudio plugin in `bridge` mode + Linux console with `--source udp` |
 | You only want to make the LIVI dashboard move | Linux console with `--source demo` |
@@ -236,13 +232,9 @@ sudo tunerstudio-livi-bridge \
 
 ## Active Serial Mode
 
-Active serial mode is for cases where you want the Linux console to talk directly to the ECU, without TunerStudio or TSDash running on that serial port.
+Use active serial mode when the Linux console should talk directly to the ECU and feed LIVI by itself. It opens the serial port, sends TunerStudio-style `r` realtime read commands, decodes the output-channel block, and emits LIVI payloads.
 
-It emulates the realtime output-channel reads observed in the usbmon dump: it sends TunerStudio-style `r` read commands, receives length-prefixed realtime responses, decodes the output-channel block, and sends LIVI payloads like the other modes.
-
-Important: unlike usbmon mode, this mode opens the serial port and writes to it. Do not use it at the same time as TunerStudio or TSDash on the same serial device.
-
-Use this mode when the Linux box running the bridge is the only program talking to the ECU. If TSDash or TunerStudio is already connected, use `--source usbmon` instead so the bridge only observes the existing traffic.
+Important: do not use this mode while TunerStudio or TSDash is connected to the same serial device. If another program is already talking to the ECU, use `--source usbmon` instead.
 
 The serial exchange uses the same framed shape used by the observed TunerStudio traffic:
 
@@ -256,7 +248,7 @@ For the default realtime read, the bridge sends commands like this:
 serial out 000772003000007900b9476445
 ```
 
-The final four bytes are the CRC32. Older development builds used zero CRC bytes; current firmware may reject that with a short status response such as `000182d1b40d81`, where `0x82` is the ECU error status. The bridge now uses CRC32 by default.
+The final four bytes are the CRC32. Current firmware may reject zero-CRC commands with a short status response such as `000182d1b40d81`, where `0x82` is the ECU error status.
 
 Example using a TunerStudio INI:
 
@@ -287,7 +279,7 @@ serial in  007a00...
 {"event":"telemetry:push","payload":{"rpm":0.0,"mapKpa":10.0,...}}
 ```
 
-If you only see repeated `drop serial poll: ECU returned serial status 0x82`, the bridge is reaching the serial device but the ECU rejected the request. Check `--serial-page`, `--serial-read-size`, `--serial-can-id`, and leave `--serial-command-crc crc32` unless you are testing a firmware known to accept zero CRC.
+If you see repeated `drop serial poll: ECU returned serial status 0x82`, the bridge is reaching the serial device but the ECU rejected the request. Check `--serial-page`, `--serial-read-size`, `--serial-can-id`, and leave `--serial-command-crc crc32` unless you are testing firmware known to accept zero CRC.
 
 Useful options:
 
@@ -301,7 +293,7 @@ Useful options:
 --serial-poll-interval 0.05
 ```
 
-The defaults match the packet shape observed in the usbmon reference dump. If your ECU firmware uses different realtime page or block sizing, adjust `--serial-page` and `--serial-read-size`. Active serial commands use a real CRC32 by default; `--serial-command-crc zero` is only for older or permissive firmware tests.
+The defaults match the packet shape observed in the usbmon reference dump. If your ECU firmware uses different realtime page or block sizing, adjust `--serial-page` and `--serial-read-size`. `--serial-command-crc zero` is only for older or permissive firmware tests.
 
 ## TunerStudio Plugin
 
@@ -522,14 +514,6 @@ You should see a payload similar to:
 - If you send UDP between two machines, check firewall and network routing.
 - If you use active serial mode, confirm that no other program is already using the same serial port.
 
-### Active Serial Mode Does Not Feed LIVI
-
-- First run the same command with `--dry-run --print-raw`. This bypasses LIVI and shows whether the ECU is returning data.
-- A good serial exchange prints `serial out`, then a longer `serial in`, then a `telemetry:push` JSON line.
-- `ECU returned serial status 0x82` means the ECU rejected the read command. Keep `--serial-command-crc crc32` and verify page, CAN id, read size, and that the selected port is the ECU.
-- Timeouts usually mean the wrong serial port, wrong baud rate, or another application already owns the port.
-- If demo mode works but serial mode does not, the LIVI side is probably fine; debug the serial exchange first.
-
 ### usbmon Does Not Open
 
 Try:
@@ -552,9 +536,3 @@ Then run the bridge again with `sudo`.
 
 That is expected. TSDash does not support TunerStudio plugins. Use the Linux console with `--source usbmon`.
 
-
-## Project Status
-
-- Linux console: most developed path and recommended especially for TSDash.
-- TunerStudio plugin: working and buildable, but less field-tested.
-- Mapping: ECU and TunerStudio project dependent. Always check dry-run output and real values before relying on it while driving.
