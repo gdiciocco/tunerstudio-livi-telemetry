@@ -238,6 +238,22 @@ It emulates the realtime output-channel reads observed in the usbmon dump: it se
 
 Important: unlike usbmon mode, this mode opens the serial port and writes to it. Do not use it at the same time as TunerStudio or TSDash on the same serial device.
 
+Use this mode when the Linux box running the bridge is the only program talking to the ECU. If TSDash or TunerStudio is already connected, use `--source usbmon` instead so the bridge only observes the existing traffic.
+
+The serial exchange uses the same framed shape used by the observed TunerStudio traffic:
+
+```text
+2-byte payload length + command payload + 4-byte CRC32
+```
+
+For the default realtime read, the bridge sends commands like this:
+
+```text
+serial out 000772003000007900b9476445
+```
+
+The final four bytes are the CRC32. Older development builds used zero CRC bytes; current firmware may reject that with a short status response such as `000182d1b40d81`, where `0x82` is the ECU error status. The bridge now uses CRC32 by default.
+
 Example using a TunerStudio INI:
 
 ```bash
@@ -258,6 +274,16 @@ tunerstudio-livi-bridge \
   --dry-run \
   --print-raw
 ```
+
+In a good dry-run you should see longer `serial in` blocks followed by JSON payloads:
+
+```text
+serial out 000772003000007900b9476445
+serial in  007a00...
+{"event":"telemetry:push","payload":{"rpm":0.0,"mapKpa":10.0,...}}
+```
+
+If you only see repeated `drop serial poll: ECU returned serial status 0x82`, the bridge is reaching the serial device but the ECU rejected the request. Check `--serial-page`, `--serial-read-size`, `--serial-can-id`, and leave `--serial-command-crc crc32` unless you are testing a firmware known to accept zero CRC.
 
 Useful options:
 
@@ -491,6 +517,14 @@ You should see a payload similar to:
 - If you use plugin direct mode, open the plugin panel in TunerStudio and check the status.
 - If you send UDP between two machines, check firewall and network routing.
 - If you use active serial mode, confirm that no other program is already using the same serial port.
+
+### Active Serial Mode Does Not Feed LIVI
+
+- First run the same command with `--dry-run --print-raw`. This bypasses LIVI and shows whether the ECU is returning data.
+- A good serial exchange prints `serial out`, then a longer `serial in`, then a `telemetry:push` JSON line.
+- `ECU returned serial status 0x82` means the ECU rejected the read command. Keep `--serial-command-crc crc32` and verify page, CAN id, read size, and that the selected port is the ECU.
+- Timeouts usually mean the wrong serial port, wrong baud rate, or another application already owns the port.
+- If demo mode works but serial mode does not, the LIVI side is probably fine; debug the serial exchange first.
 
 ### usbmon Does Not Open
 
