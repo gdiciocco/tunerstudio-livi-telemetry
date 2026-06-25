@@ -18,6 +18,11 @@ class SerialReaderTest(unittest.TestCase):
     def test_read_command_matches_usbmon_dump_shape(self) -> None:
         command = SerialReadCommand(offset=0, count=121, can_id=0, page=0x30).to_bytes()
 
+        self.assertEqual(command, bytes.fromhex("000772003000007900b9476445"))
+
+    def test_read_command_can_use_legacy_zero_crc(self) -> None:
+        command = SerialReadCommand(offset=0, count=121, can_id=0, page=0x30, crc_mode="zero").to_bytes()
+
         self.assertEqual(command, bytes.fromhex("00077200300000790000000000"))
 
     def test_active_reader_decodes_tunerstudio_response(self) -> None:
@@ -47,6 +52,25 @@ class SerialReaderTest(unittest.TestCase):
 
         self.assertEqual(reader.read_once(port), {"rpm": 3200.0, "speedKph": 88.0, "gear": "3"})
         self.assertEqual(port.requests, [SerialReadCommand(offset=0, count=130).to_bytes()])
+
+    def test_active_reader_rejects_ecu_error_status(self) -> None:
+        decoder = TunerStudioSerialDecoder(frame_length=130, fields=[])
+        response_payload = b"\x82"
+        response = len(response_payload).to_bytes(2, "big") + response_payload + b"\xd1\xb4\x0d\x81"
+        port = FakeSerialPort(response)
+
+        reader = ActiveTunerStudioSerialReader(
+            serial_port="/dev/ttyUSB0",  # type: ignore[arg-type]
+            decoder=decoder,
+            baud=115200,
+            timeout=0.5,
+            read_size=130,
+            can_id=0,
+            page=0x30,
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "0x82"):
+            reader.read_once(port)
 
 
 if __name__ == "__main__":

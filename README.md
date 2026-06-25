@@ -267,10 +267,11 @@ Useful options:
 --serial-read-size 121
 --serial-can-id 0
 --serial-page 0x30
+--serial-command-crc crc32
 --serial-poll-interval 0.05
 ```
 
-The defaults match the packet shape observed in the usbmon reference dump. If your ECU firmware uses different realtime page or block sizing, adjust `--serial-page` and `--serial-read-size`.
+The defaults match the packet shape observed in the usbmon reference dump. If your ECU firmware uses different realtime page or block sizing, adjust `--serial-page` and `--serial-read-size`. Active serial commands use a real CRC32 by default; `--serial-command-crc zero` is only for older or permissive firmware tests.
 
 ## TunerStudio Plugin
 

@@ -4,6 +4,7 @@ import os
 import select
 import sys
 import time
+import zlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -38,6 +39,7 @@ class SerialReadCommand:
     count: int
     can_id: int = 0
     page: int = 0x30
+    crc_mode: str = "crc32"
 
     def to_bytes(self) -> bytes:
         payload = bytes(
@@ -51,10 +53,13 @@ class SerialReadCommand:
                 (self.count >> 8) & 0xFF,
             ]
         )
-        # This mirrors the packets observed in the usbmon dump:
-        # u16 payload length, payload, 4 CRC bytes. Speeduino-style serial
-        # realtime reads accept zero CRC bytes for this command family.
-        return len(payload).to_bytes(2, "big") + payload + b"\x00\x00\x00\x00"
+        if self.crc_mode == "zero":
+            crc = b"\x00\x00\x00\x00"
+        elif self.crc_mode == "crc32":
+            crc = (zlib.crc32(payload) & 0xFFFFFFFF).to_bytes(4, "big")
+        else:
+            raise ValueError(f"Unsupported serial command CRC mode: {self.crc_mode}")
+        return len(payload).to_bytes(2, "big") + payload + crc
 
 
 @dataclass
@@ -164,6 +169,7 @@ class ActiveTunerStudioSerialReader:
         read_size: int,
         can_id: int,
         page: int,
+        command_crc: str = "crc32",
         print_raw: bool = False,
     ) -> None:
         if read_size <= 0:
@@ -175,19 +181,29 @@ class ActiveTunerStudioSerialReader:
         self.read_size = read_size
         self.can_id = can_id
         self.page = page
+        self.command_crc = command_crc
         self.print_raw = print_raw
 
     def read_once(self, port: PosixSerialPort) -> dict[str, Any]:
         pending: dict[str, Any] = {}
         for offset in range(0, self.decoder.frame_length, self.read_size):
             count = min(self.read_size, self.decoder.frame_length - offset)
-            command = SerialReadCommand(offset=offset, count=count, can_id=self.can_id, page=self.page).to_bytes()
+            command = SerialReadCommand(
+                offset=offset,
+                count=count,
+                can_id=self.can_id,
+                page=self.page,
+                crc_mode=self.command_crc,
+            ).to_bytes()
             if self.print_raw:
                 print(f"serial out {command.hex()}", file=sys.stderr, flush=True)
             self.decoder.decode_usbmon_event(_SerialDecoderEvent("S", False, command))
             response = port.transact(command)
             if self.print_raw:
                 print(f"serial in  {response.hex()}", file=sys.stderr, flush=True)
+            status = response_status(response)
+            if status not in (None, 0):
+                raise RuntimeError(f"ECU returned serial status 0x{status:02x}")
             self.decoder.decode_usbmon_event(_SerialDecoderEvent("C", True, response))
             for patch in self.decoder.flush():
                 merge_patch(pending, patch)
@@ -195,3 +211,12 @@ class ActiveTunerStudioSerialReader:
 
     def open(self) -> PosixSerialPort:
         return PosixSerialPort(path=self.serial_port, baud=self.baud, timeout=self.timeout)
+
+
+def response_status(response: bytes) -> int | None:
+    if len(response) < 3:
+        return None
+    declared = int.from_bytes(response[:2], "big")
+    if declared <= 0 or len(response) < 2 + declared:
+        return None
+    return response[2]

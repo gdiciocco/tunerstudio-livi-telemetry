@@ -303,6 +303,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--serial-read-size", type=int, default=121, help="Bytes requested per TunerStudio realtime read in --source serial.")
     parser.add_argument("--serial-can-id", type=parse_int_auto, default=0, help="TunerStudio CAN id byte for active serial reads, decimal or 0xNN.")
     parser.add_argument("--serial-page", type=parse_int_auto, default=0x30, help="TunerStudio realtime page byte for active serial reads, decimal or 0xNN.")
+    parser.add_argument("--serial-command-crc", choices=["crc32", "zero"], default="crc32", help="CRC mode for active serial read commands.")
     parser.add_argument("--serial-poll-interval", type=float, help="Seconds between active serial polls. Defaults to 1 / --hz.")
     parser.add_argument("--demo-cycle-seconds", type=float, default=90.0, help="Driving-cycle length for --source demo.")
     parser.add_argument("--demo-max-speed-kph", type=float, default=125.0, help="Maximum simulated speed for --source demo.")
@@ -385,6 +386,7 @@ def main(argv: list[str] | None = None) -> int:
                 read_size=args.serial_read_size,
                 can_id=args.serial_can_id,
                 page=args.serial_page,
+                command_crc=args.serial_command_crc,
                 print_raw=args.print_raw,
             ),
             emitter=emitter,
