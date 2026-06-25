@@ -13,9 +13,10 @@ from typing import Any
 from .demo import DemoTelemetryGenerator
 from .emitter import DryRunEmitter, Emitter, SocketIoEmitter
 from .mapper import TelemetryMapper, merge_patch
+from .serial_reader import ActiveTunerStudioSerialReader
 from .tunerstudio_ini import decoder_from_tunerstudio_ini, write_generated_usbmon_config
 from .usbmon import UsbMonReader, resolve_serial_usb_device
-from .usbmon_decoder import FixedFrameDecoder
+from .usbmon_decoder import FixedFrameDecoder, TunerStudioSerialDecoder
 
 
 class Bridge:
@@ -227,28 +228,88 @@ class DemoBridge:
         self.stop_event.set()
 
 
+class SerialBridge:
+    def __init__(
+        self,
+        reader: ActiveTunerStudioSerialReader,
+        emitter: Emitter,
+        event: str,
+        poll_interval: float,
+    ) -> None:
+        self.reader = reader
+        self.emitter = emitter
+        self.event = event
+        self.poll_interval = poll_interval
+        self.stop_event = threading.Event()
+
+    def run(self) -> None:
+        self.emitter.connect()
+        print(
+            f"polling {self.reader.serial_port} at {self.reader.baud} baud "
+            f"(read_size={self.reader.read_size})",
+            file=sys.stderr,
+            flush=True,
+        )
+        try:
+            with self.reader.open() as port:
+                while not self.stop_event.is_set():
+                    started = time.monotonic()
+                    try:
+                        payload = self.reader.read_once(port)
+                    except TimeoutError as exc:
+                        print(f"serial timeout: {exc}", file=sys.stderr, flush=True)
+                        payload = {}
+                    except Exception as exc:
+                        print(f"drop serial poll: {exc}", file=sys.stderr, flush=True)
+                        payload = {}
+
+                    if payload:
+                        payload.setdefault("ts", int(time.time() * 1000))
+                        self.emitter.emit(self.event, payload)
+
+                    elapsed = time.monotonic() - started
+                    delay = max(0.0, self.poll_interval - elapsed)
+                    if delay:
+                        self.stop_event.wait(delay)
+        finally:
+            self.emitter.close()
+
+    def stop(self, *_args: object) -> None:
+        self.stop_event.set()
+
+
+def parse_int_auto(text: str) -> int:
+    return int(text, 0)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Bridge TunerStudio telemetry to f-io/LIVI.")
-    parser.add_argument("--source", choices=["udp", "usbmon", "demo"], default="udp", help="Telemetry source mode.")
+    parser.add_argument("--source", choices=["udp", "usbmon", "serial", "demo"], default="udp", help="Telemetry source mode.")
     parser.add_argument("--listen-host", default="127.0.0.1", help="UDP host for the TunerStudio plugin.")
     parser.add_argument("--listen-port", type=int, default=8765, help="UDP port for the TunerStudio plugin.")
     parser.add_argument("--livi-url", default="ws://127.0.0.1:4000", help="LIVI Socket.IO URL.")
     parser.add_argument("--event", default="telemetry:push", help="Socket.IO event name.")
     parser.add_argument("--config", type=Path, help="Optional channel mapping JSON file.")
-    parser.add_argument("--serial-port", type=Path, help="Serial port used by TunerStudio, for example /dev/ttyUSB0.")
-    parser.add_argument("--usbmon-config", type=Path, help="Binary frame map for --source usbmon.")
-    parser.add_argument("--tunerstudio-ini", type=Path, help="TunerStudio mainController.ini to derive the usbmon binary frame map.")
+    parser.add_argument("--serial-port", type=Path, help="Serial port, for example /dev/ttyUSB0.")
+    parser.add_argument("--usbmon-config", type=Path, help="Binary frame map for --source usbmon or --source serial.")
+    parser.add_argument("--tunerstudio-ini", type=Path, help="TunerStudio mainController.ini to derive the realtime binary frame map.")
     parser.add_argument("--ini-endian", choices=["big", "little"], default="little", help="Endian for scalar values parsed from --tunerstudio-ini.")
     parser.add_argument("--dump-generated-usbmon-config", type=Path, help="Write the usbmon JSON generated from --tunerstudio-ini and exit.")
     parser.add_argument("--usbmon-device", type=Path, help="Override usbmon device, for example /dev/usbmon1.")
     parser.add_argument("--usbmon-direction", choices=["in", "out", "both"], default="both", help="USB bulk direction to decode.")
     parser.add_argument("--usbmon-capture-size", type=int, default=4096, help="Maximum captured bytes per usbmon event.")
+    parser.add_argument("--serial-baud", type=int, default=115200, help="Baud rate for --source serial.")
+    parser.add_argument("--serial-timeout", type=float, default=0.5, help="Serial read timeout in seconds for --source serial.")
+    parser.add_argument("--serial-read-size", type=int, default=121, help="Bytes requested per TunerStudio realtime read in --source serial.")
+    parser.add_argument("--serial-can-id", type=parse_int_auto, default=0, help="TunerStudio CAN id byte for active serial reads, decimal or 0xNN.")
+    parser.add_argument("--serial-page", type=parse_int_auto, default=0x30, help="TunerStudio realtime page byte for active serial reads, decimal or 0xNN.")
+    parser.add_argument("--serial-poll-interval", type=float, help="Seconds between active serial polls. Defaults to 1 / --hz.")
     parser.add_argument("--demo-cycle-seconds", type=float, default=90.0, help="Driving-cycle length for --source demo.")
     parser.add_argument("--demo-max-speed-kph", type=float, default=125.0, help="Maximum simulated speed for --source demo.")
     parser.add_argument("--demo-duration", type=float, help="Stop demo mode after this many seconds.")
     parser.add_argument("--hz", type=float, default=20.0, help="Maximum Socket.IO emit rate.")
     parser.add_argument("--dry-run", action="store_true", help="Print LIVI payloads instead of connecting to LIVI.")
-    parser.add_argument("--print-raw", action="store_true", help="Print raw TunerStudio UDP packets to stderr.")
+    parser.add_argument("--print-raw", action="store_true", help="Print raw source packets/bytes to stderr.")
     return parser
 
 
@@ -297,6 +358,38 @@ def main(argv: list[str] | None = None) -> int:
             capture_size=args.usbmon_capture_size,
             hz=args.hz,
             print_raw=args.print_raw,
+        )
+    elif args.source == "serial":
+        if args.usbmon_config is None and args.tunerstudio_ini is None:
+            parser.error("--source serial requires --usbmon-config or --tunerstudio-ini")
+        if args.usbmon_config is not None and args.tunerstudio_ini is not None:
+            parser.error("Use either --usbmon-config or --tunerstudio-ini, not both")
+        if args.serial_port is None:
+            parser.error("--source serial requires --serial-port")
+
+        decoder = (
+            decoder_from_tunerstudio_ini(args.tunerstudio_ini, endian=args.ini_endian)
+            if args.tunerstudio_ini is not None
+            else FixedFrameDecoder.load(args.usbmon_config)
+        )
+        if not isinstance(decoder, TunerStudioSerialDecoder):
+            parser.error("--source serial requires a tunerstudio_serial decoder")
+
+        poll_interval = args.serial_poll_interval if args.serial_poll_interval is not None else 1.0 / args.hz
+        bridge = SerialBridge(
+            reader=ActiveTunerStudioSerialReader(
+                serial_port=args.serial_port,
+                decoder=decoder,
+                baud=args.serial_baud,
+                timeout=args.serial_timeout,
+                read_size=args.serial_read_size,
+                can_id=args.serial_can_id,
+                page=args.serial_page,
+                print_raw=args.print_raw,
+            ),
+            emitter=emitter,
+            event=args.event,
+            poll_interval=poll_interval,
         )
     else:
         mapper = TelemetryMapper.load(args.config)

@@ -1,6 +1,6 @@
 # TunerStudio / TSDash to f-io LIVI telemetry bridge
 
-Questo progetto porta i dati motore letti da TunerStudio o TSDash dentro una dashboard f-io/LIVI.
+Questo progetto porta i dati motore letti da TunerStudio o TSDash dentro una dashboard [f-io/LIVI](https://github.com/f-io/LIVI).
 
 Nasce con due strade:
 
@@ -22,6 +22,7 @@ Il progetto include anche una **modalita demo** per muovere LIVI con dati plausi
 | Caso | Modalita consigliata |
 | --- | --- |
 | Uso TSDash su Linux | Console Linux con `--source usbmon` |
+| Voglio che il bridge parli direttamente con la seriale ECU | Console Linux con `--source serial` |
 | Uso TunerStudio completo e voglio una soluzione integrata | Plugin TunerStudio in modalita `direct` |
 | Uso TunerStudio completo ma voglio lasciare la logica a Linux | Plugin TunerStudio in modalita `bridge` + console Linux `--source udp` |
 | Voglio solo vedere la dashboard LIVI muoversi | Console Linux con `--source demo` |
@@ -45,6 +46,12 @@ TSDash o TunerStudio senza plugin, in lettura passiva:
 
 ```text
 TSDash/TunerStudio <-> ECU seriale USB -> /dev/usbmon -> console Linux -> LIVI
+```
+
+Polling seriale attivo senza TunerStudio/TSDash:
+
+```text
+console Linux -> ECU seriale USB -> letture realtime -> LIVI
 ```
 
 Demo:
@@ -220,6 +227,48 @@ sudo tunerstudio-livi-bridge \
   --usbmon-config generated-usbmon-map.json \
   --livi-url ws://livi.local:4000
 ```
+
+## Modalita Seriale Attiva
+
+La modalita seriale attiva serve quando vuoi che la console Linux parli direttamente con la ECU, senza TunerStudio o TSDash in esecuzione sulla stessa porta seriale.
+
+Emula le letture realtime viste nel dump usbmon: invia comandi `r` in stile TunerStudio, riceve risposte realtime con prefisso di lunghezza, decodifica il blocco output-channel e invia payload LIVI come le altre modalita.
+
+Importante: a differenza della modalita usbmon, questa modalita apre la porta seriale e scrive verso la ECU. Non usarla contemporaneamente a TunerStudio o TSDash sulla stessa seriale.
+
+Esempio usando un INI TunerStudio:
+
+```bash
+tunerstudio-livi-bridge \
+  --source serial \
+  --serial-port /dev/ttyUSB0 \
+  --tunerstudio-ini ~/TunerStudioProjects/ExampleProject/projectCfg/mainController.ini \
+  --livi-url ws://livi.local:4000
+```
+
+Parti da dry-run se non sei sicuro:
+
+```bash
+tunerstudio-livi-bridge \
+  --source serial \
+  --serial-port /dev/ttyUSB0 \
+  --tunerstudio-ini ~/TunerStudioProjects/ExampleProject/projectCfg/mainController.ini \
+  --dry-run \
+  --print-raw
+```
+
+Opzioni utili:
+
+```text
+--serial-baud 115200
+--serial-timeout 0.5
+--serial-read-size 121
+--serial-can-id 0
+--serial-page 0x30
+--serial-poll-interval 0.05
+```
+
+I default seguono la forma dei pacchetti osservata nel dump usbmon di riferimento. Se il firmware ECU usa pagina realtime o dimensione blocco diverse, modifica `--serial-page` e `--serial-read-size`.
 
 ## Plugin TunerStudio
 
@@ -440,6 +489,7 @@ Dovresti vedere un payload simile:
 - Prova prima `--source demo --dry-run`.
 - Se usi il plugin direct, apri il pannello plugin in TunerStudio e guarda lo stato.
 - Se usi UDP tra due macchine, controlla firewall e rete.
+- Se usi la modalita seriale attiva, verifica che nessun altro programma stia usando la stessa porta seriale.
 
 ### usbmon non si apre
 
@@ -462,17 +512,6 @@ Poi riesegui il bridge con `sudo`.
 ### TSDash non vede il plugin
 
 E normale: TSDash non supporta i plugin TunerStudio. Usa la console Linux con `--source usbmon`.
-
-## Privacy E Pulizia Del Repository
-
-Gli esempi usano host generici come `livi.local`, progetti di esempio e porte seriali standard come `/dev/ttyUSB0`.
-
-Prima di pubblicare log, dump o configurazioni reali:
-
-- rimuovi nomi utente e percorsi locali;
-- rimuovi IP privati della tua rete, se non vuoi mostrarli;
-- evita di pubblicare password o chiavi;
-- controlla i file generati da TunerStudio, perche possono contenere path completi.
 
 ## Stato Del Progetto
 

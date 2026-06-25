@@ -9,7 +9,7 @@ from typing import Any, Sequence
 
 from .defaults import DEFAULT_CHANNEL_MAP
 from .mapper import canonical_channel
-from .usbmon_decoder import BinaryFieldRule, FixedFrameDecoder
+from .usbmon_decoder import BinaryFieldRule, FixedFrameDecoder, TunerStudioSerialDecoder
 
 
 TS_TYPE_MAP = {
@@ -82,13 +82,13 @@ def decoder_from_tunerstudio_ini(
     ini_path: Path,
     endian: str = "little",
     include_unmapped: bool = False,
-) -> FixedFrameDecoder:
+) -> TunerStudioSerialDecoder:
     config = generate_usbmon_config_from_ini(ini_path, endian=endian, include_unmapped=include_unmapped)
     fields = [
         BinaryFieldRule.from_config(field_config, str(config["usbmon"].get("endian", "big")))
         for field_config in config["usbmon"]["fields"]
     ]
-    return FixedFrameDecoder(frame_length=int(config["usbmon"]["frame_length"]), fields=fields)
+    return TunerStudioSerialDecoder(frame_length=int(config["usbmon"]["frame_length"]), fields=fields)
 
 
 def generate_usbmon_config_from_ini(

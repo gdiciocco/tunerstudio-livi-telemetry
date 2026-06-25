@@ -24,6 +24,7 @@ The project also includes a **demo mode** that sends plausible driving telemetry
 | Situation | Recommended mode |
 | --- | --- |
 | You use TSDash on Linux | Linux console with `--source usbmon` |
+| You want the bridge itself to talk to the ECU serial port | Linux console with `--source serial` |
 | You use full TunerStudio and want a built-in integration | TunerStudio plugin in `direct` mode |
 | You use full TunerStudio but want the Linux app to handle mapping and LIVI output | TunerStudio plugin in `bridge` mode + Linux console with `--source udp` |
 | You only want to make the LIVI dashboard move | Linux console with `--source demo` |
@@ -47,6 +48,12 @@ TSDash or TunerStudio without plugins, passive read-only capture:
 
 ```text
 TSDash/TunerStudio <-> USB serial ECU -> /dev/usbmon -> Linux console -> LIVI
+```
+
+Active serial polling without TunerStudio/TSDash:
+
+```text
+Linux console -> USB serial ECU -> realtime reads -> LIVI
 ```
 
 Demo mode:
@@ -222,6 +229,48 @@ sudo tunerstudio-livi-bridge \
   --usbmon-config generated-usbmon-map.json \
   --livi-url ws://livi.local:4000
 ```
+
+## Active Serial Mode
+
+Active serial mode is for cases where you want the Linux console to talk directly to the ECU, without TunerStudio or TSDash running on that serial port.
+
+It emulates the realtime output-channel reads observed in the usbmon dump: it sends TunerStudio-style `r` read commands, receives length-prefixed realtime responses, decodes the output-channel block, and sends LIVI payloads like the other modes.
+
+Important: unlike usbmon mode, this mode opens the serial port and writes to it. Do not use it at the same time as TunerStudio or TSDash on the same serial device.
+
+Example using a TunerStudio INI:
+
+```bash
+tunerstudio-livi-bridge \
+  --source serial \
+  --serial-port /dev/ttyUSB0 \
+  --tunerstudio-ini ~/TunerStudioProjects/ExampleProject/projectCfg/mainController.ini \
+  --livi-url ws://livi.local:4000
+```
+
+Start with dry-run if you are not sure:
+
+```bash
+tunerstudio-livi-bridge \
+  --source serial \
+  --serial-port /dev/ttyUSB0 \
+  --tunerstudio-ini ~/TunerStudioProjects/ExampleProject/projectCfg/mainController.ini \
+  --dry-run \
+  --print-raw
+```
+
+Useful options:
+
+```text
+--serial-baud 115200
+--serial-timeout 0.5
+--serial-read-size 121
+--serial-can-id 0
+--serial-page 0x30
+--serial-poll-interval 0.05
+```
+
+The defaults match the packet shape observed in the usbmon reference dump. If your ECU firmware uses different realtime page or block sizing, adjust `--serial-page` and `--serial-read-size`.
 
 ## TunerStudio Plugin
 
@@ -440,6 +489,7 @@ You should see a payload similar to:
 - Try `--source demo --dry-run` first.
 - If you use plugin direct mode, open the plugin panel in TunerStudio and check the status.
 - If you send UDP between two machines, check firewall and network routing.
+- If you use active serial mode, confirm that no other program is already using the same serial port.
 
 ### usbmon Does Not Open
 
