@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tunerstudio-livi-bridge"
+version = "0.1.0"
+description = "Bridge TunerStudio output-channel telemetry to f-io/LIVI telemetry:push."
+requires-python = ">=3.10"
+dependencies = [
+  "python-socketio[client]>=5.11,<6"
+]
+
+[project.scripts]
+tunerstudio-livi-bridge = "livi_bridge.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["livi_bridge*"]
+

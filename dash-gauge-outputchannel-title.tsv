@@ -1,0 +1,24 @@
+OutputChannel	Title
+rpm	Engine Speed
+baro	Baro Pressure
+advance	Ign Advance
+afr	AFR Front
+rpm	Engine Speed
+coolant	Coolant
+afr	Air:Fuel Ratio
+iat	IAT
+oilPressure_bar	OIL
+afr2	AFR Rear
+emap	OIL
+benzina	Livello Benzina
+batteryVoltage	Battery Voltage
+fuelPressure_bar	FUEL
+vss	
+gear	
+egt_rear_out	EGT REAR
+egt_front_out	EGT FRONT
+tps	Throttle
+tsDistanceTraveledKilometersStored	
+map	Engine MAP
+tsDistanceTraveledKilometersStored	
+benzina	

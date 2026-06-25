@@ -1,0 +1,31 @@
+{
+  "channels": {
+    "rpm": { "field": "rpm" },
+    "vss1": { "field": "speedKph" },
+    "speedMph": { "field": "speedKph", "transform": "mph_to_kph", "round": 1 },
+    "clt": { "field": "coolantC" },
+    "cltF": { "field": "coolantC", "transform": "f_to_c", "round": 1 },
+    "map": { "field": "mapKpa" },
+    "mapPsi": { "field": "mapKpa", "transform": "psi_to_kpa", "round": 1 },
+    "egoLambda": { "field": "lambda", "round": 3 },
+    "batteryVoltage": { "field": "batteryV", "round": 2 },
+    "fuelLevel": { "field": "fuelPct", "min": 0, "max": 100, "round": 1 },
+    "gearRaw": {
+      "field": "gear",
+      "enum": {
+        "-1": "R",
+        "0": "N",
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5,
+        "6": 6
+      }
+    },
+    "gpsLat": { "field": "gps.lat" },
+    "gpsLng": { "field": "gps.lng" },
+    "gpsSpeedKph": { "field": "gps.speedMs", "transform": "kph_to_ms", "round": 2 }
+  }
+}
+

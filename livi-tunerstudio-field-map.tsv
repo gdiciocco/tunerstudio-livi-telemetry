@@ -1,0 +1,46 @@
+livi_field	tunerstudio_field
+ts	
+speedKph	vss
+rpm	rpm
+gear	gear
+steeringDeg	
+reverse	
+lights	
+highBeam	
+hazards	
+turn	
+parkingBrake	
+coolantC	coolant
+oilC	emap
+transmissionC	
+iatC	iat
+ambientC	iat
+batteryV	batteryVoltage
+fuelPct	benzina
+rangeKm	
+fuelRateLph	
+consumptionLPer100Km	
+consumptionAvgLPer100Km	
+batteryCapacityKwh	
+batteryLevelKwh	
+mapKpa	map
+baroKpa	baro
+boostKpa	
+lambda	lambda
+afr	afr
+odometerKm	tsDistanceTraveledKilometersStored
+odometerTripKm	
+drivingStatus	
+ambientLux	
+nightMode	
+gps.lat	
+gps.lng	
+gps.alt	
+gps.heading	
+gps.speedMs	
+gps.accuracyM	
+gps.satellites	
+gps.fixTs	
+can.id	
+can.data	
+can.bus	
