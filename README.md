@@ -463,16 +463,6 @@ Then run the bridge again with `sudo`.
 
 That is expected. TSDash does not support TunerStudio plugins. Use the Linux console with `--source usbmon`.
 
-## Privacy Before Publishing Data
-
-Examples in this repository use generic hosts such as `livi.local`, example project names, and standard serial ports such as `/dev/ttyUSB0`.
-
-Before publishing real logs, dumps, or configuration files:
-
-- remove user names and local paths;
-- remove private network IP addresses if you do not want to expose them;
-- never publish passwords or keys;
-- check generated TunerStudio files, because they may include full local paths.
 
 ## Project Status
 
